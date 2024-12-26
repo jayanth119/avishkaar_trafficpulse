@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 class MapPage extends StatefulWidget {
+  const MapPage({super.key});
+
   @override
   _MapPageState createState() => _MapPageState();
 }
@@ -15,12 +17,14 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   final Location location = Location();
   LocationData? _currentLocation;
-  TextEditingController _destinationController = TextEditingController();
+  final TextEditingController _sourceController = TextEditingController();
+  final TextEditingController _destinationController = TextEditingController();
+  LatLng? _sourceLatLng;
   LatLng? _destinationLatLng;
   bool _isFetchingRoute = false;
 
-  // Add this line to declare _placeSuggestions
-  List<String> _placeSuggestions = [];
+  List<String> _sourceSuggestions = [];
+  List<String> _destinationSuggestions = [];
 
   @override
   void initState() {
@@ -44,6 +48,7 @@ class _MapPageState extends State<MapPage> {
     LocationData locationData = await location.getLocation();
     setState(() {
       _currentLocation = locationData;
+      _sourceLatLng = LatLng(locationData.latitude!, locationData.longitude!);
     });
   }
 
@@ -75,20 +80,23 @@ class _MapPageState extends State<MapPage> {
         return LatLng(lat, lon);
       }
     }
-
     return null;
   }
 
   Future<void> _fetchRoute() async {
-    if (_currentLocation == null || _destinationLatLng == null) return;
+    if (_sourceLatLng == null || _destinationLatLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select both source and destination.")),
+      );
+      return;
+    }
 
     setState(() {
       _isFetchingRoute = true;
     });
 
-    // Open a URL for routing
     final Uri url = Uri.parse(
-        "https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${_currentLocation!.latitude},${_currentLocation!.longitude};${_destinationLatLng!.latitude},${_destinationLatLng!.longitude}");
+        "https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${_sourceLatLng!.latitude},${_sourceLatLng!.longitude};${_destinationLatLng!.latitude},${_destinationLatLng!.longitude}");
 
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -101,6 +109,43 @@ class _MapPageState extends State<MapPage> {
     setState(() {
       _isFetchingRoute = false;
     });
+  }
+
+  Widget _buildSuggestionsList(
+      List<String> suggestions, TextEditingController controller, Function(String) onSelected) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: Colors.grey),
+        borderRadius: BorderRadius.circular(4.0),
+      ),
+      child: ListView.builder(
+        shrinkWrap: true,
+        itemCount: suggestions.length,
+        itemBuilder: (context, index) {
+          final suggestion = suggestions[index];
+          return ListTile(
+            title: Text(suggestion),
+            onTap: () async {
+              final LatLng? coordinates = await _getCoordinatesFromPlace(suggestion);
+              if (coordinates != null) {
+                setState(() {
+                  controller.text = suggestion;
+                  onSelected(suggestion);
+                  suggestions.clear();
+                });
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Unable to fetch coordinates for the selected location."),
+                  ),
+                );
+              }
+            },
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -121,7 +166,8 @@ class _MapPageState extends State<MapPage> {
             Expanded(
               child: FlutterMap(
                 options: MapOptions(
-                  initialCenter: LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
+                  initialCenter: _sourceLatLng ?? const LatLng(0, 0),
+                  initialZoom: 13,
                 ),
                 children: [
                   TileLayer(
@@ -130,10 +176,11 @@ class _MapPageState extends State<MapPage> {
                   ),
                   MarkerLayer(
                     markers: [
-                      Marker(
-                        point: LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
-                        child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
-                      ),
+                      if (_sourceLatLng != null)
+                        Marker(
+                          point: _sourceLatLng!,
+                          child:  const Icon(Icons.location_pin, color: Colors.red, size: 40),
+                        ),
                       if (_destinationLatLng != null)
                         Marker(
                           point: _destinationLatLng!,
@@ -145,74 +192,63 @@ class _MapPageState extends State<MapPage> {
               ),
             )
           else
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Center(child: CircularProgressIndicator()),
-            ),
+            const Center(child: CircularProgressIndicator()),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
-                  controller: _destinationController,
+                  controller: _sourceController,
                   decoration: const InputDecoration(
-                    labelText: "Enter destination",
+                    labelText: "Enter source location",
                     border: OutlineInputBorder(),
                   ),
                   onChanged: (query) async {
                     final suggestions = await _getPlaceSuggestions(query);
                     setState(() {
-                      _placeSuggestions = suggestions;
+                      _sourceSuggestions = suggestions;
                     });
                   },
                 ),
                 const SizedBox(height: 8.0),
-                if (_placeSuggestions.isNotEmpty)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(4.0),
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: _placeSuggestions.length,
-                      itemBuilder: (context, index) {
-                        final suggestion = _placeSuggestions[index];
-                        return ListTile(
-                          title: Text(suggestion),
-                          onTap: () async {
-                            final LatLng? coordinates = await _getCoordinatesFromPlace(suggestion);
-                            if (coordinates != null) {
-                              setState(() {
-                                _destinationController.text = suggestion;
-                                _destinationLatLng = coordinates;
-                                _placeSuggestions.clear();
-                              });
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Unable to fetch coordinates for the selected location."),
-                                ),
-                              );
-                            }
-                          },
-                        );
-                      },
-                    ),
+                if (_sourceSuggestions.isNotEmpty)
+                  _buildSuggestionsList(
+                    _sourceSuggestions,
+                    _sourceController,
+                    (value) async {
+                      _sourceLatLng = await _getCoordinatesFromPlace(value);
+                    },
                   ),
+                TextField(
+                  controller: _destinationController,
+                  decoration: const InputDecoration(
+                    labelText: "Enter destination location",
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (query) async {
+                    final suggestions = await _getPlaceSuggestions(query);
+                    setState(() {
+                      _destinationSuggestions = suggestions;
+                    });
+                  },
+                ),
+                const SizedBox(height: 8.0),
+                if (_destinationSuggestions.isNotEmpty)
+                  _buildSuggestionsList(
+                    _destinationSuggestions,
+                    _destinationController,
+                    (value) async {
+                      _destinationLatLng = await _getCoordinatesFromPlace(value);
+                    },
+                  ),
+                const SizedBox(height: 16.0),
+                ElevatedButton(
+                  onPressed: _isFetchingRoute ? null : _fetchRoute,
+                  child: Text(_isFetchingRoute ? "Fetching Route..." : "Show Route"),
+                ),
               ],
             ),
           ),
-          if (_destinationLatLng != null)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ElevatedButton(
-                onPressed: _isFetchingRoute ? null : _fetchRoute,
-                child: Text(_isFetchingRoute ? "Fetching Route..." : "Show Route"),
-              ),
-            ),
         ],
       ),
     );

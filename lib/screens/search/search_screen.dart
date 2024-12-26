@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../components/cards/big/restaurant_info_big_card.dart';
-import '../../components/scalton/big_card_scalton.dart';
 import '../../constants.dart';
-import '../../demo_data.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -56,30 +53,6 @@ class _SearchScreenState extends State<SearchScreen> {
               Text(_showSearchResult ? "Search Results" : "Top Results",
                   style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: defaultPadding),
-              // Expanded(
-              //   child: ListView.builder(
-              //     itemCount: _isLoading ? 2 : 5, //5 is demo length of your data
-              //     itemBuilder: (context, index) => Padding(
-              //       padding: const EdgeInsets.only(bottom: defaultPadding),
-              //       child: _isLoading
-              //           ? const BigCardScalton()
-              //           : RestaurantInfoBigCard(
-              //               // Images are List<String>
-              //               images: demoBigImages..shuffle(),
-              //               name: "McDonald's",
-              //               rating: 4.3,
-              //               numOfRating: 200,
-              //               deliveryTime: 25,
-              //               foodType: const [
-              //                 "Chinese",
-              //                 "American",
-              //                 "Deshi food"
-              //               ],
-              //               press: () {},
-              //             ),
-              //     ),
-              //   ),
-              // ),
             ],
           ),
         ),
