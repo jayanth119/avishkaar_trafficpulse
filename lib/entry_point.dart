@@ -27,7 +27,7 @@ class _EntryPointState extends State<EntryPoint> {
 
 // Screens
   final List<Widget> _screens = [
-    const HomeScreen(),
+     MapPage(),
     const SearchScreen(),
     const ProfileScreen(),
   ];
