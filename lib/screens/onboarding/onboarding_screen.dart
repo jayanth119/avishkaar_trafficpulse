@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:trafficpulse/notifications/notifications.dart';
 import '../../constants.dart';
 
 import '../../components/dot_indicators.dart';
@@ -13,6 +15,25 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
+  NotificationServices notificationServices = NotificationServices();
+  @override
+  void initState() {
+   
+    super.initState();
+    notificationServices.requestNotificationPermission();
+    notificationServices.forgroundMessage();
+    notificationServices.firebaseInit(context);
+    notificationServices.setupInteractMessage(context);
+    notificationServices.isTokenRefresh();
+
+    notificationServices.getDeviceToken().then((value){
+      if (kDebugMode) {
+        print('device token');
+        print(value);
+      }
+    });
+  }
+
   int currentPage = 0;
   @override
   Widget build(BuildContext context) {
